@@ -1,0 +1,35 @@
+Table users {
+  id bigint [pk, increment]
+  name varchar(255) [not null]
+  email varchar(255) [unique, not null]
+  email_verified_at timestamp
+  password varchar(255) [not null]
+  remember_token varchar(100)
+  created_at timestamp
+  updated_at timestamp
+  role enum('admin','user') [not null, default: 'user']
+}
+
+Table gold_prices {
+  id bigint [pk, increment]
+  price_per_gram decimal(15,2) [not null]
+  source varchar(255)
+  created_at timestamp
+  updated_at timestamp
+}
+
+Table zakat_calculations {
+  id bigint [pk, increment]
+  user_id bigint [not null]
+  type enum('mal','profesi') [not null]
+  salary_type enum('kotor','bersih')
+  period enum('bulanan','tahunan')
+  income decimal(15,2) [not null]
+  nisab decimal(15,2) [not null]
+  zakat_amount decimal(15,2) [not null]
+  is_eligible boolean [not null]
+  created_at timestamp
+  updated_at timestamp
+}
+
+Ref: users.id < zakat_calculations.user_id [delete: cascade]

@@ -1,0 +1,35 @@
+@startuml Controllers
+
+class AuthController {
+    + register(Request $request): JsonResponse
+    + login(Request $request): JsonResponse
+    + logout(Request $request): JsonResponse
+}
+
+class ZakatController {
+    + zakatMal(Request $request): JsonResponse
+    + zakatProfesi(Request $request): JsonResponse
+    + history(Request $request): JsonResponse
+    + goldPrice(Request $request): JsonResponse
+    + dashboard(Request $request): JsonResponse
+    + store(Request $request): JsonResponse
+    + exportCSV(Request $request): JsonResponse
+}
+
+class AdminController {
+    + dashboard(Request $request): JsonResponse
+    + users(Request $request): JsonResponse
+    + deleteUser(Request $request, int $id): JsonResponse
+    + zakat(Request $request): JsonResponse
+    + updateGold(Request $request): JsonResponse
+}
+
+AuthController --> User : uses
+ZakatController --> User : uses
+ZakatController --> ZakatCalculation : uses
+ZakatController --> GoldPrice : uses
+AdminController --> User : uses
+AdminController --> ZakatCalculation : uses
+AdminController --> GoldPrice : uses
+
+@enduml

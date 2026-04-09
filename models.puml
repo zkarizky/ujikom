@@ -1,0 +1,40 @@
+@startuml Models
+
+class User {
+    + id: bigint
+    + name: string
+    + email: string
+    + password: string
+    + role: enum('admin','user')
+    + created_at: timestamp
+    + updated_at: timestamp
+    + zakats(): hasMany
+}
+
+class GoldPrice {
+    + id: bigint
+    + price_per_gram: decimal(15,2)
+    + source: string
+    + created_at: timestamp
+    + updated_at: timestamp
+}
+
+class ZakatCalculation {
+    + id: bigint
+    + user_id: bigint
+    + type: enum('mal','profesi')
+    + salary_type: enum('kotor','bersih')
+    + period: enum('bulanan','tahunan')
+    + income: decimal(15,2)
+    + nisab: decimal(15,2)
+    + zakat_amount: decimal(15,2)
+    + is_eligible: boolean
+    + created_at: timestamp
+    + updated_at: timestamp
+    + user(): belongsTo
+}
+
+User ||--o{ ZakatCalculation : hasMany
+ZakatCalculation --> User : belongsTo
+
+@enduml

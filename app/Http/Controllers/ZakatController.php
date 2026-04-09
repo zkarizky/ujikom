@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\GoldPrice;
 use App\Models\ZakatCalculation;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
-
+use Midtrans\Config;
+use Midtrans\Snap;
 
 class ZakatController extends Controller
 {
@@ -38,48 +40,48 @@ class ZakatController extends Controller
             return round($goldUsd * $usdToIdr);
         });
     }
-    public function exportCSV()
-{
-    $data = ZakatCalculation::with('user')->get();
+    public function payZakat(Request $request)
+    {
+        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
+        Config::$isProduction = false;
+        Config::$isSanitized = true;
+        Config::$is3ds = true;
 
-    $filename = "zakat.csv";
-    $headers = [
-        "Content-Type" => "text/csv",
-        "Content-Disposition" => "attachment; filename=$filename",
-    ];
+        $user = $request->user();
 
-    $callback = function () use ($data) {
-        $file = fopen('php://output', 'w');
+        $amount = (int) $request->amount;
 
-        // header
-        fputcsv($file, [
-            'Nama',
-            'Email',
-            'Jenis',
-            'Periode',
-            'Penghasilan',
-            'Zakat',
-            'Status'
+        $params = [
+            'transaction_details' => [
+                'order_id' => 'ZAKAT-' . time(),
+                'gross_amount' => $amount,
+            ],
+            'customer_details' => [
+                'first_name' => $user->name,
+                'email' => $user->email,
+            ],
+        ];
+
+        $snapToken = Snap::getSnapToken($params);
+
+        return response()->json([
+            'token' => $snapToken
         ]);
+    }
+    public function exportCsv()
+    {
+     $year = $request->year ?? date('Y');
 
-        foreach ($data as $row) {
-            fputcsv($file, [
-                $row->user->name,
-                $row->user->email,
-                $row->type,
-                $row->period,
-                $row->income,
-                $row->zakat_amount,
-                $row->is_eligible ? 'Wajib' : 'Tidak'
-            ]);
-        }
+    $payments = Payment::with(['user','zakat'])
+        ->whereYear('created_at', $year)
+        ->get();
 
-        fclose($file);
-    };
-
-    return response()->stream($callback, 200, $headers);
-}
-    public function goldPrice()
+    return response()
+        ->view('exports.zakat', compact('payments','year'))
+        ->header('Content-Type', 'application/vnd.ms-excel')
+        ->header('Content-Disposition', 'attachment; filename="zakat-'.$year.'.xls"');
+    }
+        public function goldPrice()
     {
         $price = Cache::remember('gold_price', 3600, function () {
 
@@ -103,7 +105,7 @@ class ZakatController extends Controller
             }
 
             $rateData = $rate->json();
-            $usdToIdr = $rateData['rates']['IDR'] ?? 15000;
+            $usdToIdr = $rateData['rates']['IDR'] ?? 17000;
 
             // 🔥 convert ke rupiah
             $priceIdr = $goldUsd * $usdToIdr;
@@ -122,26 +124,53 @@ class ZakatController extends Controller
         $zakat = ZakatCalculation::where('user_id', $user->id)
             ->latest()
             ->get();
+            
+        $payments = Payment::with('zakat')
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get();
 
         return response()->json([
             'user' => $user,
-            'zakat' => $zakat
+            'profile' => $user->profile,
+            'zakat' => $zakat,
+            'payments' => $payments
         ]);
     }
     public function zakatMal(Request $request)
     {
+        $user = $request->user();
+        $profile = $user->profile;
+
+        if (!$profile || !$profile->wealth) {
+            return response()->json([
+                'message' => 'Lengkapi data kekayaan di profil terlebih dahulu.'
+            ], 422);
+        }
+
+        $request->validate([
+            'debt' => 'nullable|numeric' // Form input hutang jatuh tempo
+        ]);
+
         $gold = $this->getGoldPrice();
         $nisab = 85 * $gold;
 
-        $income = $request->income;
+        $wealth = $profile->wealth;
+        $debt = $request->debt ?? 0;
+        
+        // Kekayaan dikurangi hutang jatuh tempo
+        $wealth = $wealth - $debt;
+        if ($wealth < 0) {
+            $wealth = 0;
+        }
 
-        $eligible = $income >= $nisab;
-        $zakat = $eligible ? $income * 0.025 : 0;
+        $eligible = $wealth >= $nisab;
+        $zakat = $eligible ? $wealth * 0.025 : 0;
 
         $data = ZakatCalculation::create([
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
             'type' => 'mal',
-            'income' => $income,
+            'income' => $wealth, // Simpan total kekayaan bersih setelah hutang
             'nisab' => $nisab,
             'zakat_amount' => $zakat,
             'is_eligible' => $eligible
@@ -152,21 +181,52 @@ class ZakatController extends Controller
 
     public function zakatProfesi(Request $request)
     {
+        $user = $request->user();
+        $profile = $user->profile;
+
+        if (!$profile || !$profile->income) {
+            return response()->json([
+                'message' => 'Lengkapi data gaji di profil terlebih dahulu.'
+            ], 422);
+        }
+
+        $request->validate([
+            'period' => 'required|in:bulanan,tahunan',
+            'salary_type' => 'required|in:kotor,bersih',
+            'expenses' => 'nullable|numeric' // Form input untuk gaji bersih
+        ]);
+
         $gold = $this->getGoldPrice();
 
         $nisabTahunan = 85 * $gold;
         $nisabBulanan = $nisabTahunan / 12;
 
-        $income = $request->income;
+        $income = $profile->income;
         $period = $request->period;
 
-        $nisab = $period == 'bulanan' ? $nisabBulanan : $nisabTahunan;
+        // Asumsi gaji di profil adalah gaji bulanan.
+        // Jika periode "tahunan" yang dipilih, otomatis gaji bulanan dikali 12.
+        // (Atau jika memang request Anda "periode bulanan dikali 12", berarti ini menyetahunkan hitungan.)
+        // Di sini saya implementasikan: jika setahun, dikali 12.
+        if ($period === 'tahunan') {
+            $income = $income * 12;
+        }
+
+        // Kalau pilih gaji bersih, dikurangi pengeluaran dari form input (tetap form)
+        if ($request->salary_type === 'bersih') {
+            $income = $income - ($request->expenses ?? 0);
+        }
+        if ($income < 0) {
+            $income = 0;
+        }
+
+        $nisab = $period === 'bulanan' ? $nisabBulanan : $nisabTahunan;
 
         $eligible = $income >= $nisab;
         $zakat = $eligible ? $income * 0.025 : 0;
 
         $data = ZakatCalculation::create([
-            'user_id' => auth()->id(),
+            'user_id' => $user->id,
             'type' => 'profesi',
             'salary_type' => $request->salary_type,
             'period' => $period,

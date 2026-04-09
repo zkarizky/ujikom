@@ -51,4 +51,13 @@ class User extends Authenticatable
     {
         return $this->hasMany(ZakatCalculation::class);
     }
+    public function profile()
+    {
+        return $this->hasOne(Profile::class);
+    }
+
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
 }

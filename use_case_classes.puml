@@ -1,0 +1,105 @@
+@startuml Use Case Classes
+
+package Auth {
+    class RegisterUser {
+        + execute(Request $request): JsonResponse
+    }
+
+    class LoginUser {
+        + execute(Request $request): JsonResponse
+    }
+
+    class LogoutUser {
+        + execute(Request $request): JsonResponse
+    }
+}
+
+package Zakat {
+    class CalculateZakatMal {
+        + execute(Request $request): JsonResponse
+    }
+
+    class CalculateZakatProfesi {
+        + execute(Request $request): JsonResponse
+    }
+
+    class ViewZakatHistory {
+        + execute(Request $request): JsonResponse
+    }
+
+    class ViewGoldPrice {
+        + execute(Request $request): JsonResponse
+    }
+
+    class ViewDashboard {
+        + execute(Request $request): JsonResponse
+    }
+
+    class StoreZakatCalculation {
+        + execute(Request $request): JsonResponse
+    }
+
+    class ExportZakatCSV {
+        + execute(Request $request): JsonResponse
+    }
+}
+
+package Admin {
+    class ViewAdminDashboard {
+        + execute(Request $request): JsonResponse
+    }
+
+    class ManageUsers {
+        + execute(Request $request): JsonResponse
+    }
+
+    class DeleteUser {
+        + execute(Request $request, int $id): JsonResponse
+    }
+
+    class ViewZakatData {
+        + execute(Request $request): JsonResponse
+    }
+
+    class UpdateGoldPrice {
+        + execute(Request $request): JsonResponse
+    }
+}
+
+RegisterUser --> User : creates
+LoginUser --> User : authenticates
+LogoutUser --> User : logs out
+
+CalculateZakatMal --> User : uses
+CalculateZakatMal --> ZakatCalculation : creates
+CalculateZakatMal --> GoldPrice : uses
+
+CalculateZakatProfesi --> User : uses
+CalculateZakatProfesi --> ZakatCalculation : creates
+CalculateZakatProfesi --> GoldPrice : uses
+
+ViewZakatHistory --> User : uses
+ViewZakatHistory --> ZakatCalculation : retrieves
+
+ViewGoldPrice --> GoldPrice : retrieves
+
+ViewDashboard --> User : uses
+ViewDashboard --> ZakatCalculation : retrieves
+
+StoreZakatCalculation --> User : uses
+StoreZakatCalculation --> ZakatCalculation : creates
+
+ExportZakatCSV --> ZakatCalculation : retrieves
+
+ViewAdminDashboard --> User : retrieves
+ViewAdminDashboard --> ZakatCalculation : retrieves
+
+ManageUsers --> User : retrieves
+
+DeleteUser --> User : deletes
+
+ViewZakatData --> ZakatCalculation : retrieves
+
+UpdateGoldPrice --> GoldPrice : updates
+
+@enduml

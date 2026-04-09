@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\ZakatCalculation;
+use App\Models\Payment;
 
 class AdminController extends Controller
 {
@@ -13,8 +14,11 @@ class AdminController extends Controller
     {
         return response()->json([
             'total_user' => User::count(),
-            'total_zakat' => ZakatCalculation::sum('zakat_amount'),
-            'total_transaksi' => ZakatCalculation::count(),
+            'total_zakat' => Payment::where('transaction_status', 'settlement')->sum('amount'),
+            'total_transaksi' => Payment::count(),
+
+            'total_success'=>Payment::where('transaction_status','settlement')->count(),
+            'total_pending'=>Payment::where('transaction_status','pending')->count(),
         ]);
     }
 
@@ -32,11 +36,12 @@ class AdminController extends Controller
     }
 
     // semua zakat
-    public function zakat()
+    public function payments()
     {
-        return ZakatCalculation::with('user')->latest()->get();
+        return Payment::with('user', 'zakat')
+            ->latest()
+            ->get();
     }
-
     // update harga emas
     
 }

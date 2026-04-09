@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Profile;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
@@ -12,7 +14,12 @@ class AuthController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'email' => 'required|email|unique:users',
+            'email' => [
+                'required',
+                'email:rfc,dns,spoof',
+                'max:100',
+                'unique:users,email',   
+            ],
             'password' => 'required|min:6'
         ]);
 
@@ -40,6 +47,34 @@ class AuthController extends Controller
         return response()->json(compact('user','token'));
     }
 
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'ktp' => 'nullable|string|max:20',
+            'job' => 'nullable|string|max:100',
+            'income' => 'nullable|numeric',
+            'wealth' => 'nullable|numeric',
+        ]);
+
+        // 🔥 kalau belum ada profile → create
+        // 🔥 kalau sudah ada → update
+        $profile = Profile::updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'ktp' => $request->ktp,
+                'job' => $request->job,
+                'income' => $request->income,
+                'wealth' => $request->wealth,
+            ]
+        );
+
+        return response()->json([
+            'message' => 'Profile updated',
+            'profile' => $profile
+        ]);
+    }
     public function logout(Request $request)
     {
         $request->user()->tokens()->delete();

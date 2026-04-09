@@ -1,0 +1,72 @@
+@startuml Class Diagram Zakatku
+
+class User {
+    + id: bigint
+    + name: string
+    + email: string
+    + password: string
+    + role: enum('admin','user')
+    + created_at: timestamp
+    + updated_at: timestamp
+    + zakats(): hasMany
+}
+
+class GoldPrice {
+    + id: bigint
+    + price_per_gram: decimal(15,2)
+    + source: string
+    + created_at: timestamp
+    + updated_at: timestamp
+}
+
+class ZakatCalculation {
+    + id: bigint
+    + user_id: bigint
+    + type: enum('mal','profesi')
+    + salary_type: enum('kotor','bersih')
+    + period: enum('bulanan','tahunan')
+    + income: decimal(15,2)
+    + nisab: decimal(15,2)
+    + zakat_amount: decimal(15,2)
+    + is_eligible: boolean
+    + created_at: timestamp
+    + updated_at: timestamp
+    + user(): belongsTo
+}
+
+class AuthController {
+    + register(Request $request): JsonResponse
+    + login(Request $request): JsonResponse
+    + logout(Request $request): JsonResponse
+}
+
+class ZakatController {
+    + zakatMal(Request $request): JsonResponse
+    + zakatProfesi(Request $request): JsonResponse
+    + history(Request $request): JsonResponse
+    + goldPrice(Request $request): JsonResponse
+    + dashboard(Request $request): JsonResponse
+    + store(Request $request): JsonResponse
+    + exportCSV(Request $request): JsonResponse
+}
+
+class AdminController {
+    + dashboard(Request $request): JsonResponse
+    + users(Request $request): JsonResponse
+    + deleteUser(Request $request, int $id): JsonResponse
+    + zakat(Request $request): JsonResponse
+    + updateGold(Request $request): JsonResponse
+}
+
+User ||--o{ ZakatCalculation : hasMany
+ZakatCalculation --> User : belongsTo
+
+AuthController --> User : uses
+ZakatController --> User : uses
+ZakatController --> ZakatCalculation : uses
+ZakatController --> GoldPrice : uses
+AdminController --> User : uses
+AdminController --> ZakatCalculation : uses
+AdminController --> GoldPrice : uses
+
+@enduml

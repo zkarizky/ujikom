@@ -37,6 +37,7 @@ Route::middleware(['auth:sanctum', 'role:user'])->group(function(){
     Route::post('/zakat', [ZakatController::class, 'store']);
     Route::get('/payment/history',[PaymentController::class,'history']);
     Route::post('/midtrans/transaction', [MidtransController::class, 'createTransaction']);
+    Route::post('/payment/callback', [PaymentController::class,'callback']);
     Route::post('/payment/success', function(Request $request) {
         $payment = Payment::where('order_id', $request->order_id)->first();
 

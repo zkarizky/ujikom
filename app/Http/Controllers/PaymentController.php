@@ -3,96 +3,106 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Payment;
 use Midtrans\Config;
 use Midtrans\Snap;
-use App\Models\Payment;
 
 class PaymentController extends Controller
 {
-    /**
-     * Membuat transaksi (order) pembayaran baru ke payment gateway Midtrans
-     */
+    // 🔥 CREATE TRANSACTION
     public function create(Request $request)
     {
-        // Konfigurasi Kredensial Midtrans
+        // config midtrans
         Config::$serverKey = env('MIDTRANS_SERVER_KEY');
-        Config::$isProduction = false; // Gunakan mode sandbox/testing
-        Config::$isSanitized = true;   // Bersihkan input sebelum diproses Midtrans
-        Config::$is3ds = true;         // Gunakan protokol 3D Secure untuk keamanan CC
+        Config::$isProduction = false;
+        Config::$isSanitized = true;
+        Config::$is3ds = true;
 
-        // Buat ID pesanan unik menggunakan prefiks 'ZAKAT-' digabung uniqid random
-        $order_id = 'ZAKAT-' . uniqid();
+        // order id unik
+        $order_id = 'ZKT-' . time() . rand(100,999);
 
-        // Parameter dasar yang wajib dikirim ke API Snap Midtrans
+        // parameter midtrans
         $params = [
             'transaction_details' => [
                 'order_id' => $order_id,
-                'gross_amount' => (int)$request->amount, // Nominal bayar
+                'gross_amount' => (int)$request->amount,
             ],
             'customer_details' => [
-                'first_name' => auth()->user()->name,    // Identitas pembayar
+                'first_name' => auth()->user()->name,
                 'email' => auth()->user()->email,
             ],
         ];
 
-        // Memanggil layanan Midtrans untuk mendapatkan Snap Token (kunci popup Midtrans)
+        // ambil snap token
         $snapToken = Snap::getSnapToken($params);
 
-        // 🔥 SIMPAN KE DB: Simpan histori tagihan berstatus 'pending' (menunggu bayar)
+        // simpan ke DB
         $payment = Payment::create([
             'user_id' => auth()->id(),
             'zakat_id' => $request->zakat_id,
             'order_id' => $order_id,
             'amount' => $request->amount,
             'snap_token' => $snapToken,
-            'transaction_status' => 'pending' // Status standar awal adalah pending
+            'transaction_status' => 'pending',
         ]);
 
-        // Mengembalikan Snap Token berbentuk JSON untuk dipakai oleh Frontend
         return response()->json([
-            'token' => $snapToken
+            'snap_token' => $snapToken
         ]);
     }
 
-    /**
-     * Menangani respons otomatis (Webhook / Callback) dari server Midtrans
-     * Fungsi ini dipanggil secara otomatis oleh Midtrans saat ada perubahan status bayar.
-     */
- public function callback(Request $request)
-{
-    \Log::info("MIDTRANS CALLBACK", $request->all());
+    // 🔥 CALLBACK MIDTRANS (WAJIB DI LUAR AUTH)
+    public function callback(Request $request)
+    {
+        \Log::info("MIDTRANS CALLBACK", $request->all());
 
-    $orderId = $request->order_id;
-    $status = $request->transaction_status;
-    $paymentType = $request->payment_type;
+        Config::$serverKey = env('MIDTRANS_SERVER_KEY');
 
-    $payment = Payment::where('order_id', $orderId)->first();
+        // validasi signature (biar aman)
+        $signature = hash('sha512',
+            $request->order_id .
+            $request->status_code .
+            $request->gross_amount .
+            Config::$serverKey
+        );
 
-    if (!$payment) {
-        \Log::error("PAYMENT NOT FOUND: " . $orderId);
-        return response()->json(['message' => 'Payment not found'], 404);
+        if ($signature !== $request->signature_key) {
+            \Log::error("INVALID SIGNATURE");
+            return response()->json(['message' => 'Invalid signature'], 403);
+        }
+
+        $order_id = $request->order_id;
+
+        $payment = Payment::where('order_id', $order_id)->first();
+
+        // kalau ga ketemu (biasanya test notif)
+        if (!$payment) {
+            \Log::warning("PAYMENT NOT FOUND: " . $order_id);
+            return response()->json(['message' => 'ignored']);
+        }
+
+        // update status
+        $payment->update([
+            'transaction_status' => $request->transaction_status,
+            'payment_type' => $request->payment_type,
+        ]);
+
+        \Log::info("PAYMENT UPDATED", [
+            'order_id' => $order_id,
+            'status' => $request->transaction_status
+        ]);
+
+        return response()->json(['message' => 'OK']);
     }
 
-    $payment->update([
-        'transaction_status' => $status,
-        'payment_type' => $paymentType
-    ]);
-
-    \Log::info("PAYMENT UPDATED", [
-        'order_id' => $orderId,
-        'status' => $status
-    ]);
-
-    return response()->json(['message' => 'OK']);
-}
-    /**
-     * Memuat daftar transaksi milik admin atau user yang berstatus lunas (settlement)
-     */
+    // 🔥 HISTORY PAYMENT USER
     public function history()
     {
-        // Hanya ambil tagihan pembayaran yang transaksinya sudah berhasil lunas
-        $payments = Payment::where('transaction_status', 'settlement')->get();
-        
+        $payments = Payment::with(['user','zakat'])
+            ->where('user_id', auth()->id())
+            ->latest()
+            ->get();
+
         return response()->json($payments);
-    }   
+    }
 }

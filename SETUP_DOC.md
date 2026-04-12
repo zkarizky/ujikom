@@ -130,3 +130,4 @@ composer run dev
 ```
 Perintah ini akan menjalankan server Laravel, memantau *queue*, dan otomatis me-*refresh* *build* Vite di satu layar *command prompt* secara bersamaan.
 Buka link yang disediakan di terminal (Biasanya `http://localhost:8000`) di browser Anda.
+

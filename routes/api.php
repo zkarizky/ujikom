@@ -11,7 +11,7 @@ use App\Models\Payment;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-Route::middleware(['auth:sanctum','admin'])->prefix('admin')->group(function(){
+Route::middleware(['auth:sanctum','role:admin'])->prefix('admin')->group(function(){
 
     Route::get('/dashboard',[AdminController::class,'dashboard']);
     Route::get('/payments',[AdminController::class,'payments']);
@@ -21,8 +21,10 @@ Route::middleware(['auth:sanctum','admin'])->prefix('admin')->group(function(){
     Route::get('/zakat',[AdminController::class,'zakat']);
 
     Route::post('/gold-price',[AdminController::class,'updateGold']);
+    Route::get('/export',[ZakatController::class,'exportCsv']);
+
 });
-Route::middleware('auth:sanctum')->group(function(){
+Route::middleware(['auth:sanctum', 'role:user'])->group(function(){
 
     Route::post('/logout',[AuthController::class,'logout']);
     Route::post('payment/create',[PaymentController::class,'create']);
@@ -34,18 +36,20 @@ Route::middleware('auth:sanctum')->group(function(){
     Route::get('/dashboard', [ZakatController::class, 'dashboard']);
     Route::post('/zakat', [ZakatController::class, 'store']);
     Route::get('/payment/history',[PaymentController::class,'history']);
-Route::post('/payment/success', function(Request $request) {
-    $payment = Payment::where('order_id', $request->order_id)->first();
+    Route::post('/midtrans/transaction', [MidtransController::class, 'createTransaction']);
+    Route::post('/payment/success', function(Request $request) {
+        $payment = Payment::where('order_id', $request->order_id)->first();
 
-    if ($payment) {
-        $payment->update([
-            'status' => 'settlement'
-        ]);
-    }
+        if ($payment) {
+            $payment->update([
+                'status' => 'settlement'
+            ]);
+        }
 
-    return response()->json(['message' => 'updated']);
-});    
+        return response()->json(['message' => 'updated']);
+    });    
 });
 // Sementara untuk testing — hapus middleware di route
-Route::get('/zakat/export', [ZakatController::class, 'exportCsv']); // tanpa auth dulu
+    Route::get('/admin/export',[ZakatController::class,'exportCsv']);
+
 Route::post('/payment/callback', [PaymentController::class,'callback']);

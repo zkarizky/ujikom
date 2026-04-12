@@ -1,7 +1,7 @@
 <table border="1">
     <tr>
-        <td colspan="7" style="text-align:center; font-weight:bold; font-size:16px;">
-            LAPORAN ZAKAT TAHUN {{ $year }}
+        <td colspan="10" style="text-align:center; font-weight:bold;">
+            LAPORAN PEMBAYARAN ZAKAT TAHUN {{ $year }}
         </td>
     </tr>
 
@@ -34,16 +34,16 @@
     </tr>
 
     @foreach($payments as $i => $item)
-    <tr>
-        <td>{{ $i+1 }}</td>
-        <td>{{ $item->user->name ?? '-' }}</td>
-        <td>{{ $item->user->email ?? '-' }}</td>
-        <td>{{ $item->zakat->type ?? '-' }}</td>
-        <td>{{ $item->payment_type }}</td>
-        <td>{{ number_format($item->amount,0,',','.') }}</td>
-        <td>{{ $item->transaction_status }}</td>
-        <td>{{ date('d-m-Y', strtotime($item->created_at)) }}</td>
-    </tr>
+        <tr>
+            <td>{{ $i + 1 }}</td>
+            <td>{{ $item->user->name ?? '-' }}</td>
+            <td>{{ $item->user->email ?? '-' }}</td>
+            <td>{{ $item->zakat->type ?? '-' }}</td>
+            <td>{{ $item->payment_type }}</td>
+            <td>{{ number_format($item->amount, 0, ',', '.') }}</td>
+            <td>{{ $item->transaction_status }}</td>
+            <td>{{ date('d-m-Y', strtotime($item->created_at)) }}</td>
+        </tr>
     @endforeach
 
     <tr>
@@ -52,7 +52,7 @@
 
     <tr>
         <td colspan="3" style="text-align:center;">
-            Mengetahui<br><br><br><br>
+            Saksi<br><br><br><br>
             Admin Zakat
         </td>
 
